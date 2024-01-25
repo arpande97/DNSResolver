@@ -15,5 +15,5 @@ public class DNSResponseEntity
     private short numberOfAnswers;
     private short numberOfAuthorities;
     private short numberOfAdditional;
-    private List<String> listOfIPs;
+    private List<ResourceRecord> resourceRecords;
 }

@@ -3,48 +3,54 @@ package com.architproject.dnsresolver.application;
 import com.architproject.dnsresolver.controller.DNSResponseDTO;
 import com.architproject.dnsresolver.domain.DNSResponseEntity;
 import com.architproject.dnsresolver.domain.DomainNameConverter;
+import com.architproject.dnsresolver.domain.ResourceRecord;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.List;
 
 
 public class DomainNameProcessor
 {
-    private int dnsPort = 53;
-    private String serverIp = "8.8.8.8";
+    private int DNS_PORT = 53;
+    private String DEFAULT_SERVER_IP = "198.41.0.4";
 
 
     DomainNameConverter domainNameConverter = new DomainNameConverter();
-    public DNSResponseDTO processDomainName(String domain)
+    public DNSResponseDTO processDomain(String domain)
     {
-        byte[] requestArray = domainNameConverter.createQueryWithDomainName(domain);
-        //For debug purposes
-        //String requestString = convertByteArrayToHex(requestArray);
-        DNSResponseEntity responseObject;
-        DatagramSocket socket;
-        try
-        {
-            socket = new DatagramSocket();
-            InetAddress serverAddress = InetAddress.getByName(serverIp);
-            DatagramPacket request = new DatagramPacket(requestArray,
-                    requestArray.length, serverAddress, dnsPort);
-            socket.send(request);
-            DatagramPacket response = new DatagramPacket(new byte[1024],
-                    1024);
-            socket.receive(response);
-            byte[] responseArray = response.getData();
-            responseObject =
-                    domainNameConverter.readResponseFromServer(responseArray, domain);
-            socket.close();
-            return convertEntityToDTO(responseObject);
-        } catch (IOException e)
-        {
-            e.printStackTrace();
-        }
 
+        DNSResponseEntity responseEntity = domainNameConverter.processDomainName(domain, DEFAULT_SERVER_IP);
+        if(checkIfAnswerRRsAreEmpty(responseEntity))
+        {
+            responseEntity = queryForNameServers(responseEntity, domain);
+        }
+        return convertEntityToDTO(responseEntity);
+    }
+    private boolean checkIfAnswerRRsAreEmpty(DNSResponseEntity response)
+    {
+        return response.getNumberOfAnswers() == 0;
+    }
+    private DNSResponseEntity queryForNameServers(DNSResponseEntity response, String domain)
+    {
+        List<String> nameServers = new ArrayList<>();
+        List<ResourceRecord> records = response.getResourceRecords();
+        for(ResourceRecord record : records)
+        {
+            nameServers.add(record.getRData());
+        }
+        for(String nameServer : nameServers)
+        {
+            System.out.println("Querying " + nameServer);
+            DNSResponseEntity responseFromNameServer = domainNameConverter.processDomainName(domain, nameServer);
+            if(responseFromNameServer.getNumberOfAnswers() != 0)
+                return responseFromNameServer;
+            else
+                return queryForNameServers(responseFromNameServer, domain);
+        }
         return null;
     }
 
@@ -52,7 +58,7 @@ public class DomainNameProcessor
     {
         DNSResponseDTO dto = new DNSResponseDTO();
         dto.setQuery(responseObject.getQuery());
-        dto.setListOfIPs(responseObject.getListOfIPs());
+        dto.setRecords(responseObject.getResourceRecords());
         return dto;
     }
 

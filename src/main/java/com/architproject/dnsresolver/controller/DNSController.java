@@ -16,7 +16,7 @@ public class DNSController
     {
 
         DNSResponseDTO responseDTO =
-                domainNameProcessor.processDomainName(domainName);
+                domainNameProcessor.processDomain(domainName);
         return responseDTO;
     }
 }
